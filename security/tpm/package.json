@@ -8,7 +8,10 @@
   "typings": "index.d.ts",
   "dependencies": {
     "azure-iot-common": "1.2.2",
-    "debug": "^3.0.1"
+    "base32-encode": "^1.0.0",
+    "debug": "^3.0.1",
+    "machina": "^2.0.0",
+    "tss.js": "^0.0.2"
   },
   "devDependencies": {
     "chai": "^3.5.0",
