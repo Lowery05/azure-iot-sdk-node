@@ -11,7 +11,7 @@ import base32Encode = require('base32-encode');
 
 import * as dbg from 'debug';
 
-const debug = dbg('azure-iot-security-tpm:tpmclient');
+const debug = dbg('azure-iot-security-tpm:TpmSecurityClient');
 
 
 const aes128SymDef = new tss.TPMT_SYM_DEF_OBJECT(TPM_ALG_ID.AES, 128, TPM_ALG_ID.CFB);
@@ -35,30 +35,27 @@ const srkTemplate = new TPMT_PUBLIC(TPM_ALG_ID.SHA256,
   new tss.TPM2B_PUBLIC_KEY_RSA());
 
 
-export class PersKeyInfo {
-  public constructor(
-      /**
-       * Human readable name for debugging/logging purposes only
-       */
-      public name: string,
+interface PersistentKeyInformation {
+  /**
+   * Human readable name for debugging/logging purposes only
+   */
+  name: string;
 
-      /**
-       * The TPM hierarachy, to which the key belongs
-       * @note All the keys are persisted in the owner hierarchy disregarding their mother one
-       */
-      public hierarchy: TPM_HANDLE,
+  /**
+   * The TPM hierarachy, to which the key belongs
+   * @note All the keys are persisted in the owner hierarchy disregarding their mother one
+   */
+  hierarchy: TPM_HANDLE;
 
-      /**
-       * Handle value where the persistent key is expected to be found
-       */
-      public handle: TPM_HANDLE,
+  /**
+   * Handle value where the persistent key is expected to be found
+   */
+  handle: TPM_HANDLE;
 
-      /**
-       * Template to be used for key cretaion if the persistent key with the given handle does not exist
-       */
-      public template: TPMT_PUBLIC
-
-  ) {}
+  /**
+   * Template to be used for key cretaion if the persistent key with the given handle does not exist
+   */
+  template: TPMT_PUBLIC;
 }
 
 
@@ -72,8 +69,8 @@ export class TpmSecurityClient  {
   private _idKeyPub: TPMT_PUBLIC = null;
 
 
-  constructor(useSimulator: boolean, registrationId?: string) {
-    this._tpm = new Tpm(useSimulator);
+  constructor(registrationId?: string, customTpm?: any) {
+    this._tpm = customTpm ? customTpm : new Tpm(false);
     if (registrationId) {
       this._registrationId = registrationId;
     }
@@ -82,6 +79,8 @@ export class TpmSecurityClient  {
       states: {
         disconnected: {
           _onEnter: (callback, err) => {
+            this._ek = null;
+            this._srk = null;
             if (callback) {
               if (err) {
                 callback(err);
@@ -109,21 +108,21 @@ export class TpmSecurityClient  {
               }
             });
           },
-          signWithIdentity: (callback) => {
+          signWithIdentity: (dataToSign, callback) => {
             this._fsm.handle('connect', (err, result) => {
               if (err) {
                 callback(err);
               } else {
-                this._fsm.handle('signWithIdentity', callback);
+                this._fsm.handle('signWithIdentity', dataToSign, callback);
               }
             });
           },
-          activateSymmetricIdentityIdentity: (callback) => {
+          activateSymmetricIdentityIdentity: (identityKey, callback) => {
             this._fsm.handle('connect', (err, result) => {
               if (err) {
                 callback(err);
               } else {
-                this._fsm.handle('activateSymmetricIdentityIdentity', callback);
+                this._fsm.handle('activateSymmetricIdentityIdentity', identityKey, callback);
               }
             });
           },
@@ -134,23 +133,23 @@ export class TpmSecurityClient  {
            }
         },
         connecting: {
-          _onEnter: (callback, err) => {
+          _onEnter: (callback) => {
             try {
               let self = this;
               this._tpm.connect(function (): void {
-                self._createPersistentPrimary(new PersKeyInfo('EK', tss.Endorsement, ekPersHandle, ekTemplate), (ekCreateErr, ekPublicKey) => {
-                  if (!ekCreateErr) {
+                self._createPersistentPrimary({ name: 'EK', hierarchy: tss.Endorsement, handle: ekPersHandle, template: ekTemplate }, (ekCreateErr, ekPublicKey) => {
+                  if (ekCreateErr) {
+                    self._fsm.transition('disconnected', callback, ekCreateErr);
+                  } else {
                     self._ek = ekPublicKey;
-                    self._createPersistentPrimary(new PersKeyInfo('SRK', tss.Owner, srkPersHandle, srkTemplate), (srkCreateErr: Error, srkPublicKey: TPMT_PUBLIC) => {
-                      if (!srkCreateErr) {
+                    self._createPersistentPrimary({ name: 'SRK', hierarchy: tss.Owner, handle: srkPersHandle, template: srkTemplate }, (srkCreateErr: Error, srkPublicKey: TPMT_PUBLIC) => {
+                      if (srkCreateErr) {
+                        self._fsm.transition('disconnected', callback, srkCreateErr);
+                      } else {
                         self._srk = srkPublicKey;
                         self._fsm.transition('connected', callback);
-                      } else {
-                        self._fsm.transition('disconnected', callback, srkCreateErr);
                       }
                     });
-                  } else {
-                    self._fsm.transition('disconnected', callback, ekCreateErr);
                   }
                 });
               });
@@ -161,7 +160,7 @@ export class TpmSecurityClient  {
           '*': () => this._fsm.deferUntilTransition()
         },
         connected: {
-          _onEnter: (callback, err) => {
+          _onEnter: (callback) => {
             callback(null);
           },
           getEndorsementKey: (callback) => {
@@ -170,25 +169,23 @@ export class TpmSecurityClient  {
           getStorageRootKey: (callback) => {
             callback(null, this._srk.asTpm2B());
           },
-          signWithIdentity: (deviceIdData, callback) => {
-            this._signData(deviceIdData, (errSign: Error, signedData: Buffer) => {
-              if (errSign) {
-                debug('Error from signing data: ' + errSign);
-                callback(errSign);
-                this._fsm.transition('disconnected');
+          signWithIdentity: (dataToSign, callback) => {
+            this._signData(dataToSign, (err: Error, signedData: Buffer) => {
+              if (err) {
+                debug('Error from signing data: ' + err);
+                this._fsm.transition('disconnected', callback, err);
               } else {
                 callback(null, signedData);
               }
             });
           },
           activateSymmetricIdentity: (identityKey, callback) => {
-            this._activateSymetricIdentity(identityKey, (errActivate: Error) => {
-              if (errActivate) {
-                debug('Error from activate: ' + errActivate);
-                callback(errActivate);
-                this._fsm.transition('disconnected');
+            this._activateSymetricIdentity(identityKey, (err: Error) => {
+              if (err) {
+                debug('Error from activate: ' + err);
+                this._fsm.transition('disconnected', callback, err);
               } else {
-                callback(null, null);
+                callback(null);
               }
             });
           },
@@ -205,19 +202,20 @@ export class TpmSecurityClient  {
     this._fsm.handle('getStorageRootKey', callback);
   }
 
-  signWithIdentity(deviceIdData: Buffer, callback: (err: Error, signedResponse: Buffer) => void): void {
-    if (deviceIdData === null || deviceIdData.length === 0) {
-        throw new ReferenceError('\'deviceIdData\' cannot be \'' + deviceIdData + '\'');
+  signWithIdentity(dataToSign: Buffer, callback: (err: Error, signedData: Buffer) => void): void {
+    if (dataToSign === null || dataToSign.length === 0) {
+        throw new ReferenceError('\'dataToSign\' cannot be \'' + dataToSign + '\'');
     }
-
     if (this._idKeyPub == null) {
-        throw new errors.ArgumentError('activateIdentityKey first before signing');
+        throw new errors.InvalidOperationError('activateSymmetricIdentity must be invoked before any signing is attempted.');
     }
-
-    this._fsm.handle('signWithIdentity', deviceIdData, callback);
+    this._fsm.handle('signWithIdentity', dataToSign, callback);
   }
 
   activateSymmetricIdentity(identityKey: Buffer, callback: (err: Error, returnedActivate: Buffer) => void): void {
+    if (identityKey === null || identityKey.length === 0) {
+      throw new ReferenceError('\'identityKey\' cannot be \'' + identityKey + '\'');
+    }
     this._fsm.handle('activateSymmetricIdentiy', identityKey, callback);
   }
 
@@ -231,17 +229,14 @@ export class TpmSecurityClient  {
         } else {
           let hasher = crypto.createHash('sha256');
           hasher.update(endorsementKey);
-          let hashedEndorsement: Buffer = hasher.digest();
-          let basedEndorsement: string = base32Encode(hashedEndorsement, 'RFC4648');
-          let loweredEndorsment: string = basedEndorsement.toLowerCase();
-          this._registrationId = loweredEndorsment.replace(/=/g, '');
+          this._registrationId = (base32Encode(hasher.digest(), 'RFC4648').toLowerCase()).replace(/=/g, '');
           callback(null, this._registrationId);
         }
       }.bind(this));
     }
   }
 
-  private _createPersistentPrimary(pki: PersKeyInfo, callback: (err: Error, resultPublicKey: TPMT_PUBLIC) => void): void {
+  private _createPersistentPrimary(pki: PersistentKeyInformation, callback: (err: Error, resultPublicKey: TPMT_PUBLIC) => void): void {
     this._tpm.allowErrors().ReadPublic(pki.handle, (resp: tss.ReadPublicResponse) => {
       let rc = this._tpm.getLastResponseCode();
       debug('ReadPublic(' + pki.name + ') returned ' + TPM_RC[rc] +  (rc === TPM_RC.SUCCESS ? '; PUB: ' + resp.outPublic.toString() : ''));
@@ -262,7 +257,7 @@ export class TpmSecurityClient  {
     });
   }
 
-  private _signData(deviceIdData: Buffer, callback: (err: Error, signedResponse: Buffer) => void): void {
+  private _signData(dataToSign: Buffer, callback: (err: Error, signedData: Buffer) => void): void {
 
     let idKeyHashAlg: TPM_ALG_ID = (<tss.TPMS_SCHEME_HMAC>(<tss.TPMS_KEYEDHASH_PARMS>this._idKeyPub.parameters).scheme).hashAlg;
 
@@ -272,23 +267,23 @@ export class TpmSecurityClient  {
         callback(new errors.DeviceRegistrationFailedError('Unexpected result of TPM2_GetCapability(TPM_PT.INPUT_BUFFER)'), null);
       } else {
         let maxInputBuffer: number = props.tpmProperty[0].value;
-        if (deviceIdData.length <= maxInputBuffer) {
-          this._tpm.withSession(tss.NullPwSession).HMAC(idKeyPersHandle, deviceIdData, idKeyHashAlg, (signature: Buffer) => {
+        if (dataToSign.length <= maxInputBuffer) {
+          this._tpm.withSession(tss.NullPwSession).HMAC(idKeyPersHandle, dataToSign, idKeyHashAlg, (signature: Buffer) => {
             callback(null, signature);
           });
         } else {
           let curPos: number = 0;
-          let bytesLeft: number = deviceIdData.length;
+          let bytesLeft: number = dataToSign.length;
           let hSequence: TPM_HANDLE = null;
           let signature = new Buffer(0);
           let loopFn = () => {
             if (bytesLeft > maxInputBuffer) {
-                this._tpm.withSession(tss.NullPwSession).SequenceUpdate(hSequence, deviceIdData.slice(curPos, curPos + maxInputBuffer), loopFn);
+                this._tpm.withSession(tss.NullPwSession).SequenceUpdate(hSequence, dataToSign.slice(curPos, curPos + maxInputBuffer), loopFn);
                 console.log('SequenceUpdate() invoked for slice [' + curPos + ', ' + (curPos + maxInputBuffer) + ']');
                 bytesLeft -= maxInputBuffer;
                 curPos += maxInputBuffer;
             } else {
-              this._tpm.withSession(tss.NullPwSession).SequenceComplete(hSequence, deviceIdData.slice(curPos, curPos + bytesLeft), new TPM_HANDLE(tss.TPM_RH.NULL), (resp: tss.SequenceCompleteResponse) => {
+              this._tpm.withSession(tss.NullPwSession).SequenceComplete(hSequence, dataToSign.slice(curPos, curPos + bytesLeft), new TPM_HANDLE(tss.TPM_RH.NULL), (resp: tss.SequenceCompleteResponse) => {
                 console.log('SequenceComplete() succeeded; signature size ' + signature.length);
               });
             }
