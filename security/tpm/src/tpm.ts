@@ -117,12 +117,12 @@ export class TpmSecurityClient  {
               }
             });
           },
-          activateSymmetricIdentityIdentity: (identityKey, callback) => {
+          activateSymmetricIdentity: (identityKey, callback) => {
             this._fsm.handle('connect', (err, result) => {
               if (err) {
                 callback(err);
               } else {
-                this._fsm.handle('activateSymmetricIdentityIdentity', identityKey, callback);
+                this._fsm.handle('activateSymmetricIdentity', identityKey, callback);
               }
             });
           },
@@ -180,7 +180,7 @@ export class TpmSecurityClient  {
             });
           },
           activateSymmetricIdentity: (identityKey, callback) => {
-            this._activateSymetricIdentity(identityKey, (err: Error) => {
+            this._activateSymmetricIdentity(identityKey, (err: Error) => {
               if (err) {
                 debug('Error from activate: ' + err);
                 this._fsm.transition('disconnected', callback, err);
@@ -216,7 +216,7 @@ export class TpmSecurityClient  {
     if (identityKey === null || identityKey.length === 0) {
       throw new ReferenceError('\'identityKey\' cannot be \'' + identityKey + '\'');
     }
-    this._fsm.handle('activateSymmetricIdentiy', identityKey, callback);
+    this._fsm.handle('activateSymmetricIdentity', identityKey, callback);
   }
 
   getRegistrationId(callback: (err: Error, registrationId: string) => void): void {
@@ -298,7 +298,7 @@ export class TpmSecurityClient  {
     });
   }
 
-  private _activateSymetricIdentity(activationBlob: Buffer, activateCallback: (err: Error) => void): void {
+  private _activateSymmetricIdentity(activationBlob: Buffer, activateCallback: (err: Error) => void): void {
 
     let currentPosition = 0;
     let credentialBlob: tss.TPMS_ID_OBJECT;
