@@ -1,9 +1,29 @@
 'use strict';
 
+var EventEmitter = require('events').EventEmitter;
 var Http = require('../lib/http.js').Http;
 var assert = require('chai').assert;
+var errors = require('azure-iot-common').errors;
 
 describe('Http', function() {
+  describe('#buildRequest', function() {
+
+    /*Tests_SRS_NODE_HTTP_18_001: [ If the http request is aborted, `buildRequest` shall invoke the `done` callback, passing an `OperationCancelledError` object ] */
+    it ('returns OperationCancelledError on abort', function(callback) {
+      var http = new Http();
+      http._request = function() {
+        return new EventEmitter();
+      };
+
+      var req = http.buildRequest('GET', '/', {}, 'host', function(err) {
+        assert.instanceOf(err, errors.OperationCancelledError);
+        callback();
+      });
+
+      req.emit('abort');
+    });
+  });
+
   describe('#parseErrorBody', function(){
     /*Tests_SRS_NODE_DEVICE_HTTP_16_001: [If the error body can be parsed the `parseErrorBody` function shall return an object with the following properties:
     - `name`: the name of the error that the server is returning

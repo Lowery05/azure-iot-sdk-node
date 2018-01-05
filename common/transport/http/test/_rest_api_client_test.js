@@ -31,7 +31,7 @@ describe('RestApiClient', function() {
         }, ReferenceError);
       });
     });
- 
+
     /*Tests_SRS_NODE_IOTHUB_REST_API_CLIENT_16_002: [The `RestApiClient` constructor shall throw an `ArgumentError` if config is missing a `host` property.]*/
     ['host'].forEach(function(badPropName) {
       [undefined, null, ''].forEach(function(badPropValue) {
@@ -506,4 +506,22 @@ describe('RestApiClient', function() {
       });
     });
   });
+
+  describe('#abort', function() {
+    it ('calls abort on the current operation', function(callback) {
+
+      /* Tests_SRS_NODE_IOTHUB_REST_API_CLIENT_18_003: [ If an `executeApiCall` operation is in progress, `cancelCurrentRequest` shall call abort on the `ClientRequest` object. ] */
+      var fakeHttpHelper = {
+        buildRequest: function() {
+          return {
+            abort: function() { callback(); },
+            end: function() {}
+          };
+        }
+      };
+      var client = new RestApiClient(fakeConfig, fakeAgent, fakeHttpHelper);
+      client.executeApiCall('GET', '/test/path', {}, {}, function() {});
+      client.abort();
+    });
+  })
 });

@@ -5,7 +5,7 @@
 
 import { ClientRequest, IncomingMessage } from 'http';
 import { request, RequestOptions } from 'https';
-import { Message, X509 } from 'azure-iot-common';
+import { Message, X509, errors } from 'azure-iot-common';
 import dbg = require('debug');
 const debug = dbg('azure-iot-common.Http');
 
@@ -26,6 +26,9 @@ export type HttpCallback = (err: Error, body?: string, response?: IncomingMessag
  *                  You generally want to use these higher-level objects (such as [azure-iot-device-http.Http]{@link module:azure-iot-device-http.Http}) rather than this one.
  */
 export class Http {
+
+  private _request: (options: RequestOptions | string, callback?: (res: IncomingMessage) => void) => ClientRequest = request;
+
   /**
    * @method              module:azure-iot-http-base.Http.buildRequest
    * @description         Builds an HTTP request object using the parameters supplied by the caller.
@@ -72,7 +75,7 @@ export class Http {
       httpOptions.passphrase = (x509Options as X509).passphrase;
     }
 
-    let httpReq = request(httpOptions, (response: IncomingMessage): void => {
+    let httpReq = this._request(httpOptions, (response: IncomingMessage): void => {
       let responseBody = '';
       response.on('error', (err: Error): void => {
         done(err);
@@ -94,6 +97,12 @@ export class Http {
 
     /*Codes_SRS_NODE_HTTP_05_003: [If buildRequest encounters an error before it can send the request, it shall invoke the done callback function and pass the standard JavaScript Error object with a text description of the error (err.message).]*/
     httpReq.on('error', done);
+
+    /*Codes_SRS_NODE_HTTP_18_001: [ If the http request is aborted, `buildRequest` shall invoke the `done` callback, passing an `OperationCancelledError` object ] */
+    httpReq.on('abort', () => {
+      done(new errors.OperationCancelledError('http request aborted'));
+    });
+
     /*Codes_SRS_NODE_HTTP_05_002: [buildRequest shall return a Node.js https.ClientRequest object, upon which the caller must invoke the end method in order to actually send the request.]*/
     return httpReq;
   }

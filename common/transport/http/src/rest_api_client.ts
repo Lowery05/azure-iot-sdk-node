@@ -37,6 +37,7 @@ export class RestApiClient {
   private _config: RestApiClient.TransportConfig;
   private _http: HttpBase;
   private _userAgent: string;
+  private _currentRequest: ClientRequest;
 
   constructor(config: RestApiClient.TransportConfig, userAgent: string, httpRequestBuilder?: HttpBase) {
     /*Codes_SRS_NODE_IOTHUB_REST_API_CLIENT_16_001: [The `RestApiClient` constructor shall throw a `ReferenceError` if config is falsy.]*/
@@ -118,6 +119,7 @@ export class RestApiClient {
     }
 
     const requestCallback = (err, responseBody, response) =>  {
+      this._currentRequest = null;
       if (err) {
         if (response) {
           /*Codes_SRS_NODE_IOTHUB_REST_API_CLIENT_16_010: [If the HTTP request fails with an error code >= 300 the `executeApiCall` method shall translate the HTTP error into a transport-agnostic error using the `translateError` method and call the `done` callback with the resulting error as the only argument.]*/
@@ -152,6 +154,20 @@ export class RestApiClient {
     }
 
     request.end();
+    this._currentRequest = request;
+  }
+
+  /**
+   * @method             module:azure-iothub.RestApiClient.abort
+   *
+   * @description        cancels the current in-progress request
+   */
+  abort(): void {
+    /* Codes_SRS_NODE_IOTHUB_REST_API_CLIENT_18_003: [ If an `executeApiCall` operation is in progress, `cancelCurrentRequest` shall call abort on the `ClientRequest` object. ] */
+    if (this._currentRequest) {
+      this._currentRequest.abort();
+      this._currentRequest = null;
+    }
   }
 
   /**
