@@ -55,6 +55,7 @@ export class TpmSecurityClient  {
           _onEnter: (callback, err) => {
             this._ek = null;
             this._srk = null;
+            this._idKeyPub = null;
             if (callback) {
               if (err) {
                 callback(err);
@@ -112,13 +113,17 @@ export class TpmSecurityClient  {
               this._tpm.connect(() => {
                 this._createPersistentPrimary('EK', tss.Endorsement, TpmSecurityClient._ekPersistentHandle, TpmSecurityClient._ekTemplate, (ekCreateErr: Error, ekPublicKey: TPMT_PUBLIC) => {
                   if (ekCreateErr) {
+                    /*Codess_SRS_NODE_TPM_SECURITY_CLIENT_06_007: [Any errors from interacting with the TPM hardware will cause in SecurityDeviceError to be returned in the err parameter of the callback.] */
                     this._fsm.transition('disconnected', callback, ekCreateErr);
                   } else {
+                    /*Codes_SRS_NODE_TPM_SECURITY_CLIENT_06_006: [The `getEndorsmentKey` function shall query the TPM hardware and return the `endorsementKey` in the callback.] */
                     this._ek = ekPublicKey;
                     this._createPersistentPrimary('SRK', tss.Owner, TpmSecurityClient._srkPersistentHandle, TpmSecurityClient._srkTemplate, (srkCreateErr: Error, srkPublicKey: TPMT_PUBLIC) => {
                       if (srkCreateErr) {
+                        /*Codes_SRS_NODE_TPM_SECURITY_CLIENT_06_009: [Any errors from interacting with the TPM hardware will cause in SecurityDeviceError to be returned in the err parameter of the callback.] */
                         this._fsm.transition('disconnected', callback, srkCreateErr);
                       } else {
+                        /*Codes_SRS_NODE_TPM_SECURITY_CLIENT_06_008: [The `getStorageRootKey` function shall query the TPM hardware and return the `storageRootKey` in the callback.] */
                         this._srk = srkPublicKey;
                         this._fsm.transition('connected', callback);
                       }
@@ -176,17 +181,21 @@ export class TpmSecurityClient  {
   }
 
   signWithIdentity(dataToSign: Buffer, callback: (err: Error, signedData: Buffer) => void): void {
-    if (dataToSign === null || dataToSign.length === 0) {
+
+    /*Codes_SRS_NODE_TPM_SECURITY_CLIENT_06_011: [If `dataToSign` is falsy, an ReferenceError will be thrown.] */
+    if (!dataToSign || dataToSign.length === 0) {
         throw new ReferenceError('\'dataToSign\' cannot be \'' + dataToSign + '\'');
     }
-    if (this._idKeyPub == null) {
+
+    /*Codes_**SRS_NODE_TPM_SECURITY_CLIENT_06_013: [** If `signWithIdentity` is invoked without a previous successful invocation of `activateSymmetricIdentity`, an InvalidOperationError is thrown. **]** */
+    if (!this._idKeyPub) {
         throw new errors.InvalidOperationError('activateSymmetricIdentity must be invoked before any signing is attempted.');
     }
     this._fsm.handle('signWithIdentity', dataToSign, callback);
   }
 
   activateSymmetricIdentity(identityKey: Buffer, callback: (err: Error, returnedActivate: Buffer) => void): void {
-    if (identityKey === null || identityKey.length === 0) {
+    if (!identityKey || identityKey.length === 0) {
       throw new ReferenceError('\'identityKey\' cannot be \'' + identityKey + '\'');
     }
     this._fsm.handle('activateSymmetricIdentity', identityKey, callback);
@@ -205,7 +214,7 @@ export class TpmSecurityClient  {
         /*Codes_SRS_NODE_TPM_SECURITY_CLIENT_06_004: [If not provided, the `registrationId` will be constructed and returned as follows:
           The endorsementKey will be queried.
           The endorsementKey will be hashed utilizing SHA256.
-          The resultant digest will be bin32 encoded in conformance with the `RFC4648` specification.
+          The resultant digest will be base 32 encoded in conformance with the `RFC4648` specification.
           The resultant string will have terminating `=` characters removed.] */
           const hasher = crypto.createHash('sha256');
           hasher.update(endorsementKey);

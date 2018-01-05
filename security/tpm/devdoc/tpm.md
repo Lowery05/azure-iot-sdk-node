@@ -6,8 +6,6 @@
 ## Example usage
 TBD
 
-## Constructor
-
 ### TpmSecurityClient(registrationId?: string, customTpm?: any) [constructor]
 
 The `TpmSecurityClient` constructor initializes a new instance of a `TpmSecurityClient` object that is used to query TPM entities and perform key manipulation and setup.
@@ -36,9 +34,7 @@ Queries and returns the public portion of the storage root key in the TPM hardwa
 
 The `signWithIdentity` function will perform an HMAC signing with a previously defined symmetric identity.
 
-**SRS_NODE_TPM_SECURITY_CLIENT_06_011: [** If `dataToSign` is falsy, an InvalidReference error will be thrown. **]**
-
-**SRS_NODE_TPM_SECURITY_CLIENT_06_012: [** If the type of `dataToSign` is NOT Buffer, an ArgumentError will be thrown. **]**
+**SRS_NODE_TPM_SECURITY_CLIENT_06_011: [** If `dataToSign` is falsy, an ReferenceError will be thrown. **]**
 
 **SRS_NODE_TPM_SECURITY_CLIENT_06_013: [** If `signWithIdentity` is invoked without a previous successful invocation of `activateSymmetricIdentity`, an InvalidOperationError is thrown. **]**
 
@@ -46,9 +42,7 @@ The `signWithIdentity` function will perform an HMAC signing with a previously d
 
 The `activateSymmetricIdentity` will set up the TPM to perform sigining operation utilizing the `identityKey` specified withing the identity key argument.
 
-**SRS_NODE_TPM_SECURITY_CLIENT_06_014: [** If the `identityKey` parameter is falsy, an IvalidReference error will be thrown. **]**
-
-**SRS_NODE_TPM_SECURITY_CLIENT_06_015: [** If the `identityKey` parameter is not of type Buffer, an ArgumentErrorr will be thrown. **]**
+**SRS_NODE_TPM_SECURITY_CLIENT_06_014: [** If the `identityKey` parameter is falsy, an ReferenceError will be thrown. **]**
 
 ### getRegistrationId(callback: (err: Error, registrationId: string) => void): void
 
@@ -60,7 +54,7 @@ This function returns the `registrationId` for the particular device.
 
 The endorsementKey will be queried.
 The endorsementKey will be hashed utilizing SHA256.
-The resultant digest will be bin32 encoded in conformance with the `RFC4648` specification.
+The resultant digest will be base 32 encoded in conformance with the `RFC4648` specification.
 The resultant string will have terminating `=` characters removed. **]**
 
 **SRS_NODE_TPM_SECURITY_CLIENT_06_005: [** Any errors from interacting with the TPM hardware will cause an SecurityDeviceError to be returned in the err parameter of the callback. **]**
