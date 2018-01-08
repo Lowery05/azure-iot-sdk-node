@@ -409,6 +409,23 @@ describe('RestApiClient', function() {
         client.executeApiCall('GET', '/test/path', testHeaders, testRequestBody, testCallback);
       });
     });
+
+    /*Tests_SRS_NODE_IOTHUB_REST_API_CLIENT_18_004: [ `executeApiCall` shall return an `HttpOperation` object. ] */
+    /*Tests_SRS_NODE_IOTHUB_REST_API_CLIENT_18_003: [ `HttpOperation.abort` shall call `abort` on the `ClientRequest` object. ] */
+    it ('returns an object with an abort function', function(callback) {
+
+      var fakeHttpHelper = {
+        buildRequest: function() {
+          return {
+            abort: function() { callback(); },
+            end: function() {}
+          };
+        }
+      };
+      var client = new RestApiClient(fakeConfig, fakeAgent, fakeHttpHelper);
+      var httpOperation = client.executeApiCall('GET', '/test/path', {}, {}, function() {});
+      httpOperation.abort();
+    });
   });
 
   describe('#updateSharedAccessSignature', function() {
@@ -506,22 +523,4 @@ describe('RestApiClient', function() {
       });
     });
   });
-
-  describe('#abort', function() {
-    it ('calls abort on the current operation', function(callback) {
-
-      /* Tests_SRS_NODE_IOTHUB_REST_API_CLIENT_18_003: [ If an `executeApiCall` operation is in progress, `cancelCurrentRequest` shall call abort on the `ClientRequest` object. ] */
-      var fakeHttpHelper = {
-        buildRequest: function() {
-          return {
-            abort: function() { callback(); },
-            end: function() {}
-          };
-        }
-      };
-      var client = new RestApiClient(fakeConfig, fakeAgent, fakeHttpHelper);
-      client.executeApiCall('GET', '/test/path', {}, {}, function() {});
-      client.abort();
-    });
-  })
 });

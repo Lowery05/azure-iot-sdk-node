@@ -374,7 +374,7 @@ describe('Amqp', function () {
           amqp.disconnect(function() {});
         });
 
-        /*Tests_SRS_NODE_PROVISIONING_AMQP_18_009: [ `disconnect` shall disonnect the AMQP connection and cancel the operation that intiatiated a connection if called while the connection is in process. ] */
+        /*Tests_SRS_NODE_PROVISIONING_AMQP_18_009: [ `disconnect` shall disonnect the AMQP connection and cancel the operation that initiated a connection if called while the connection is in process. ] */
         it ( 'disconnects and cancels ' + op.name + ' operation if called while connecting', function(testCallback) {
           fakeAmqpBase.attachSenderLink = sinon.stub();
 
@@ -418,7 +418,7 @@ describe('Amqp', function () {
         registrationRequest,
         queryOperationStatus
       ].forEach(function(op) {
-        /*Tests_SRS_NODE_PROVISIONING_AMQP_18_005: [ `cancel` shall disconnect the AMQP connection and cancel the operation that intiatiated a connection if called while the connection is in process. ] */
+        /*Tests_SRS_NODE_PROVISIONING_AMQP_18_005: [ `cancel` shall disconnect the AMQP connection and cancel the operation that initiated a connection if called while the connection is in process. ] */
         it ( 'disconnects and cancels ' + op.name + ' operation if called while connecting', function(testCallback) {
           fakeAmqpBase.attachSenderLink = sinon.stub();
 

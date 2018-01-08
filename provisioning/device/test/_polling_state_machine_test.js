@@ -17,9 +17,6 @@ var fakeRequest = {
 }
 var fakeError = new Error(fakeErrorText);
 
-assert.isNotAnError = function(err) { assert.isNotOk(err, 'expected success, got an error.'); };
-assert.isAnError = function(err) { assert.isOk(err, 'expected an error.  got success'); };
-
 var waitingForNetworkIo = function () { return sinon.spy(function () { }); };
 var registrationRequestReturnsAssigning = function(pollingInterval) { return sinon.stub().callsArgWith(1, null, { status: 'Assigning' }, null, pollingInterval || 0); };
 var registrationRequestReturnsAssigned = function() { return sinon.stub().callsArgWith(1, null, { status: 'Assigned' }); };
@@ -84,8 +81,7 @@ describe('state machine', function () {
       it ('and returns failure if it fails', function (testCallback) {
         machine._transport.registrationRequest = registrationRequestReturnsFailure();
         callRegisterWithDefaultArgs(function (err) {
-          assert.isAnError(err);
-          assert.strictEqual(err.constructor.name, 'Error');
+          assert.instanceOf(err, Error);
           assert.strictEqual(err.message, fakeErrorText);
           testCallback();
         });
@@ -94,7 +90,7 @@ describe('state machine', function () {
       /* Tests_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_014: [ If `PollingTransport.registrationRequest` succeeds with status==Assigned, it shall emit an 'operationStatus' event and  call `callback` with null, the response body, and the protocol-specific result. ] */
       it ('and returns success if it succeeds with status===\'Assigned\'', function (testCallback) {
         callRegisterWithDefaultArgs(function (err,responseBody) {
-          assert.isNotAnError(err);
+          assert.oneOf(err, [null, undefined]);
           assert.strictEqual(responseBody.status, 'Assigned');
           testCallback();
         });
@@ -118,8 +114,7 @@ describe('state machine', function () {
       it ('and returns failure if it succeeds with some other status', function (testCallback) {
         machine._transport.registrationRequest = registrationRequestReturnsBadResponse();
         callRegisterWithDefaultArgs(function (err) {
-          assert.isAnError(err);
-          assert.strictEqual(err.constructor.name, 'SyntaxError');
+          assert.instanceOf(err, SyntaxError);
           assert.strictEqual(err.message, 'status is ' + fakeBadStatus);
           testCallback();
         });
@@ -129,8 +124,7 @@ describe('state machine', function () {
       it ('and returns failure if status==Failed', function (testCallback) {
         machine._transport.registrationRequest = registrationRequestReturnsFailed();
         callRegisterWithDefaultArgs(function (err) {
-          assert.isAnError(err);
-          assert.strictEqual(err.constructor.name, 'DeviceRegistrationFailedError');
+          assert.instanceOf(err, errors.DeviceRegistrationFailedError);
           testCallback();
         });
       });
@@ -157,8 +151,7 @@ describe('state machine', function () {
         machine._transport.queryOperationStatus = operationStatusReturnsFailure();
         callRegisterWithDefaultArgs(function (err) {
           assert(machine._transport.queryOperationStatus.calledOnce);
-          assert.isAnError(err);
-          assert.strictEqual(err.constructor.name, 'Error');
+          assert.instanceOf(err, Error);
           assert.strictEqual(err.message, fakeErrorText);
           testCallback();
         });
@@ -167,7 +160,7 @@ describe('state machine', function () {
       /* Tests_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_020: [ If `PollingTransport.queryOperationStatus` succeeds with status==Assigned, `register` shall complete and pass the body of the response and the protocol-spefic result to the `callback`. ] */
       it ('and returns success if it succeeds with status===\'Assigned\'', function (testCallback) {
         callRegisterWithDefaultArgs(function (err, responseBody) {
-          assert.isNotAnError(err);
+          assert.oneOf(err, [null, undefined]);
           assert.strictEqual(responseBody.status, 'Assigned');
           testCallback();
         });
@@ -178,7 +171,7 @@ describe('state machine', function () {
         machine._transport.queryOperationStatus = operationStatusReturnsAssigningThenAssigned();
 
         callRegisterWithDefaultArgs(function (err, responseBody) {
-          assert.isNotAnError(err);
+          assert.oneOf(err, [null, undefined]);
           assert.strictEqual(responseBody.status, 'Assigned');
           assert(machine._transport.queryOperationStatus.calledTwice);
           testCallback();
@@ -189,8 +182,7 @@ describe('state machine', function () {
       it ('and returns failure if it succeeds with some other status', function (testCallback) {
         machine._transport.queryOperationStatus = operationStatusReturnsBadResponse();
         callRegisterWithDefaultArgs(function (err) {
-          assert.isAnError(err);
-          assert.strictEqual(err.constructor.name, 'SyntaxError');
+          assert.instanceOf(err, SyntaxError);
           assert.strictEqual(err.message, 'status is ' + fakeBadStatus);
           testCallback();
         });
@@ -199,8 +191,7 @@ describe('state machine', function () {
       it ('and returns failure if status==Failed', function (testCallback) {
         machine._transport.queryOperationStatus = operationStatusReturnsFailed();
         callRegisterWithDefaultArgs(function (err) {
-          assert.isAnError(err);
-          assert.strictEqual(err.constructor.name, 'DeviceRegistrationFailedError');
+          assert.instanceOf(err, errors.DeviceRegistrationFailedError);
           testCallback();
         });
       });
@@ -212,7 +203,7 @@ describe('state machine', function () {
         var handler = sinon.stub();
         machine.on('operationStatus', handler);
         callRegisterWithDefaultArgs(function (err) {
-          assert.isNotAnError(err);
+          assert.oneOf(err, [null, undefined]);
           assert(handler.calledTwice);
           testCallback();
         });
@@ -269,7 +260,7 @@ describe('state machine', function () {
     /* Tests_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_025: [ If `cancel` is called while disconnected, it shall immediately call its `callback`. ] */
     it ('does nothing if called while disconnected', function (testCallback) {
       machine.cancel(function(err) {
-        assert.isNotAnError(err);
+        assert.oneOf(err, [null, undefined]);
         assert(machine);
         assertNoTransportFunctionsCalled(machine);
         testCallback();
@@ -279,7 +270,7 @@ describe('state machine', function () {
     /* Tests_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_030: [ If `cancel` is called while the transport is connected but idle, it shall immediately call its `callback`. ] */
     it ('does nothing if called while idle', function (testCallback) {
       callRegisterWithDefaultArgs(function(err) {
-        assert.isNotAnError(err);
+        assert.oneOf(err, [null, undefined]);
         testCallback();
       });
     });
@@ -295,8 +286,7 @@ describe('state machine', function () {
         });
         callRegisterWithDefaultArgs(function(err) {
           registrationErr = err;
-          assert.isAnError(err);
-          assert.strictEqual(err.constructor.name, 'OperationCancelledError');
+          assert.instanceOf(err, errors.OperationCancelledError);
           assert(machine._transport.registrationRequest.calledOnce);
           assert.isFalse(machine._transport.queryOperationStatus.calledOnce);
         });
@@ -316,8 +306,7 @@ describe('state machine', function () {
         machine._transport.registrationRequest = registrationRequestReturnsAssigning(1000);
         callRegisterWithDefaultArgs(function(err) {
           registrationErr = err;
-          assert.isAnError(err);
-          assert.strictEqual(err.constructor.name, 'OperationCancelledError');
+          assert.instanceOf(err, errors.OperationCancelledError);
           assert(machine._transport.registrationRequest.calledOnce);
           assert.isFalse(machine._transport.queryOperationStatus.calledOnce);
         });
@@ -340,8 +329,7 @@ describe('state machine', function () {
         });
         callRegisterWithDefaultArgs(function(err) {
           registrationErr = err;
-          assert.isAnError(err);
-          assert.strictEqual(err.constructor.name, 'OperationCancelledError');
+          assert.instanceOf(err, errors.OperationCancelledError);
           assert(machine._transport.registrationRequest.calledOnce);
           assert(machine._transport.queryOperationStatus.calledOnce);
         });
@@ -364,7 +352,7 @@ describe('state machine', function () {
       machine._transport.disconnect = sinon.spy(() => assert.fail('transport disconnect should not be called'));
 
       machine.disconnect(function(err) {
-        assert.isNotAnError(err);
+        assert.oneOf(err, [null, undefined]);
         testCallback();
       });
     });
@@ -374,10 +362,9 @@ describe('state machine', function () {
       machine._transport.disconnect = sinon.stub().callsArgWith(0, fakeError);
 
       callRegisterWithDefaultArgs(function(err) {
-        assert.isNotAnError(err);
+        assert.oneOf(err, [null, undefined]);
 
         machine.disconnect(function(err) {
-          assert.isAnError(err);
           assert.strictEqual(err, fakeError);
           assert.isTrue(machine._transport.disconnect.calledOnce);
           testCallback();
@@ -423,7 +410,7 @@ describe('state machine', function () {
       }
     ].forEach(function(op) {
       it ('cancels ' + op.name + ' and disconnects', function (testCallback) {
-        var registerCallbackCalled;
+        var registerCallbackCalled = false;
         op.preconfigure();
 
         callRegisterWithDefaultArgs(function(err) {
@@ -433,7 +420,7 @@ describe('state machine', function () {
 
         setTimeout(function () {
           machine.disconnect(function() {
-            assert(registerCallbackCalled);
+            assert.isTrue(registerCallbackCalled);
             assert.isTrue(machine._transport.disconnect.calledOnce);
             op.assert();
             testCallback();

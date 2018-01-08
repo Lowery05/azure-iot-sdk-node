@@ -186,12 +186,12 @@ export class Amqp extends EventEmitter implements X509ProvisioningTransport {
               }
             });
           },
-          /*Codes_SRS_NODE_PROVISIONING_AMQP_18_005: [ `cancel` shall disconnect the AMQP connection and cancel the operation that intiatiated a connection if called while the connection is in process. ] */
+          /*Codes_SRS_NODE_PROVISIONING_AMQP_18_005: [ `cancel` shall disconnect the AMQP connection and cancel the operation that initiated a connection if called while the connection is in process. ] */
           cancel: (callback) => {
             this._cancelAllOperations();
             this._amqpStateMachine.transition('disconnecting', null, null, callback);
           },
-          /*Codes_SRS_NODE_PROVISIONING_AMQP_18_009: [ `disconnect` shall disonnect the AMQP connection and cancel the operation that intiatiated a connection if called while the connection is in process. ] */
+          /*Codes_SRS_NODE_PROVISIONING_AMQP_18_009: [ `disconnect` shall disonnect the AMQP connection and cancel the operation that initiated a connection if called while the connection is in process. ] */
           disconnect: (callback) => {
             this._cancelAllOperations();
             this._amqpStateMachine.transition('disconnecting', null, null, callback);

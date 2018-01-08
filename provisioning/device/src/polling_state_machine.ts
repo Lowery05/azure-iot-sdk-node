@@ -65,7 +65,7 @@ export class  PollingStateMachine extends EventEmitter {
           /* Codes_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_033: [ If `disconnect` is called while in the middle of a `registrationRequest` operation, the operation shall be cancelled and the transport shall be disconnected. ] */
           disconnect: (callback) => {
             this._fsm.handle('cancel', null, null, null, (err) => {
-              this._fsm.transition('disconnecting', callback);
+              this._fsm.handle('disconnect', callback);
             });
           },
           /* Codes_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_024: [ If `register` is called while a different request is in progress, it shall fail with an `InvalidOperationError`. ] */
@@ -147,7 +147,7 @@ export class  PollingStateMachine extends EventEmitter {
           /* Codes_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_034: [ If `disconnect` is called while the state machine is waiting to poll, the current operation shall be cancelled and the transport shall be disconnected. ] */
           disconnect: (callback) => {
             this._fsm.handle('cancel', null, null, null, (err) => {
-              this._fsm.transition('disconnecting', callback);
+              this._fsm.handle('disconnect', callback);
             });
           },
           register: (request, callback) => callback(new errors.InvalidOperationError('another operation is in progress'))
@@ -168,7 +168,7 @@ export class  PollingStateMachine extends EventEmitter {
           /* Codes_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_035: [ If `disconnect` is called while in the middle of a `queryOperationStatus` operation, the operation shall be cancelled and the transport shall be disconnected. ] */
           disconnect: (callback) => {
             this._fsm.handle('cancel', null, null, null, (err) => {
-              this._fsm.transition('disconnecting', callback);
+              this._fsm.handle('disconnect', callback);
             });
           },
           /* Codes_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_024: [ If `register` is called while a different request is in progress, it shall fail with an `InvalidOperationError`. ] */

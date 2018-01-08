@@ -27,8 +27,6 @@ export type HttpCallback = (err: Error, body?: string, response?: IncomingMessag
  */
 export class Http {
 
-  private _request: (options: RequestOptions | string, callback?: (res: IncomingMessage) => void) => ClientRequest = request;
-
   /**
    * @method              module:azure-iot-http-base.Http.buildRequest
    * @description         Builds an HTTP request object using the parameters supplied by the caller.
@@ -75,7 +73,7 @@ export class Http {
       httpOptions.passphrase = (x509Options as X509).passphrase;
     }
 
-    let httpReq = this._request(httpOptions, (response: IncomingMessage): void => {
+    let httpReq = request(httpOptions, (response: IncomingMessage): void => {
       let responseBody = '';
       response.on('error', (err: Error): void => {
         done(err);
