@@ -4,6 +4,7 @@
 'use strict';
 
 var PollingStateMachine = require('../lib/polling_state_machine').PollingStateMachine;
+var ProvisioningDeviceConstants = require('../lib/constants').ProvisioningDeviceConstants;
 var sinon = require('sinon');
 var assert = require('chai').assert;
 var errors = require('azure-iot-common').errors;
@@ -100,9 +101,7 @@ describe('state machine', function () {
       it ('and starts polling if it succeeds with status===\'Assigning\'', function (testCallback) {
         machine._transport.registrationRequest = registrationRequestReturnsAssigning();
         machine._transport.queryOperationStatus = waitingForNetworkIo();
-        callRegisterWithDefaultArgs(function () {
-          assert(false, 'register should never complete in this test');
-        });
+        callRegisterWithDefaultArgs(function () {});
         setTimeout(function () {
           assert(machine._transport.registrationRequest.calledOnce);
           assert(machine._transport.queryOperationStatus.calledOnce);
@@ -213,13 +212,12 @@ describe('state machine', function () {
     /* Tests_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_024: [ If `register` is called while a different request is in progress, it shall fail with an `InvalidOperationError`. ] */
     it ('fails if called while sending the first request', function (testCallback) {
       machine._transport.registrationRequest = waitingForNetworkIo();
-      callRegisterWithDefaultArgs(function() {
-        assert(false, 'register should never complete in this test');
-      });
+      callRegisterWithDefaultArgs(function() {});
 
       setTimeout(function() {
         callRegisterWithDefaultArgs(function(err) {
           assert.strictEqual(err.constructor.name, 'InvalidOperationError');
+          machine.cancel(function() {});
           testCallback();
         });
       },10);
@@ -233,25 +231,25 @@ describe('state machine', function () {
       setTimeout(function() {
         callRegisterWithDefaultArgs(function(err) {
           assert.strictEqual(err.constructor.name, 'InvalidOperationError');
+          machine.cancel(function() {});
           testCallback();
         });
       },10);
     });
 
     /* Tests_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_024: [ If `register` is called while a different request is in progress, it shall fail with an `InvalidOperationError`. ] */
-    if ('fails if called while sending an operation status request', function (testCallback) {
-      machine._transport.registrationRequest = registrationRequestReturnsAssigning();
+    it ('fails if called while sending an operation status request', function (testCallback) {
+      machine._transport.registrationRequest = registrationRequestReturnsAssigning(1);
       machine._transport.queryOperationStatus = waitingForNetworkIo();
-      callRegisterWithDefaultArgs(function() {
-        assert(false, 'register should never complete in this test');
-      });
+      callRegisterWithDefaultArgs(function() {});
 
       setTimeout(function() {
         callRegisterWithDefaultArgs(function(err) {
           assert.strictEqual(err.constructor.name, 'InvalidOperationError');
+          machine.cancel(function() {});
           testCallback();
         });
-      },10);
+      },2);
     });
   });
 
@@ -290,14 +288,14 @@ describe('state machine', function () {
           assert(machine._transport.registrationRequest.calledOnce);
           assert.isFalse(machine._transport.queryOperationStatus.calledOnce);
         });
-        setTimeout(function () {
-          machine.cancel(function() {
+        machine.cancel(function() {
+          setTimeout(function() {
             registrationCallback();
             assert(!!registrationErr);
             assert(machine._transport.cancel.calledOnce);
             testCallback();
-          });
-        }, 2);
+          }, 2);
+        });
       });
 
       /* Tests_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_027: [ If a registration is in progress, `cancel` shall cause that registration to fail with an `OperationCancelledError`. ] */
@@ -310,22 +308,29 @@ describe('state machine', function () {
           assert(machine._transport.registrationRequest.calledOnce);
           assert.isFalse(machine._transport.queryOperationStatus.calledOnce);
         });
-        setTimeout(function () {
+        process.nextTick(function () {  // wait for us to enter waitingToPoll state
           machine.cancel(function() {
-            assert(!!registrationErr);
-            assert(machine._transport.cancel.calledOnce);
-            testCallback();
+            process.nextTick(function() { // wait for cancelled op's callback to be called
+              assert(!!registrationErr);
+              assert(machine._transport.cancel.calledOnce);
+              testCallback();
+            });
           });
-        }, 2);
+        });
       });
 
       /* Tests_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_027: [ If a registration is in progress, `cancel` shall cause that registration to fail with an `OperationCancelledError`. ] */
       it ('and causes register to fail if called while sending an operation status request', function (testCallback) {
         var registrationErr;
-        var registrationCallback;
-	      machine._transport.registrationRequest = registrationRequestReturnsAssigning();
-        machine._transport.queryOperationStatus = sinon.spy(function (registrationId, operationId, callback) {
-          registrationCallback = callback;
+        machine._transport.registrationRequest = registrationRequestReturnsAssigning();
+        machine._transport.queryOperationStatus = sinon.spy(function() {
+          machine.cancel(function() {
+            setTimeout(function() {
+              assert(!!registrationErr);
+              assert(machine._transport.cancel.calledOnce);
+              testCallback();
+            }, 2);
+          });
         });
         callRegisterWithDefaultArgs(function(err) {
           registrationErr = err;
@@ -333,14 +338,6 @@ describe('state machine', function () {
           assert(machine._transport.registrationRequest.calledOnce);
           assert(machine._transport.queryOperationStatus.calledOnce);
         });
-        setTimeout(function () {
-          machine.cancel(function() {
-            registrationCallback();
-            assert(!!registrationErr);
-            assert(machine._transport.cancel.calledOnce);
-            testCallback();
-          });
-        }, 2);
       });
     });
   });
@@ -420,12 +417,61 @@ describe('state machine', function () {
 
         setTimeout(function () {
           machine.disconnect(function() {
-            assert.isTrue(registerCallbackCalled);
-            assert.isTrue(machine._transport.disconnect.calledOnce);
-            op.assert();
-            testCallback();
+            process.nextTick(function() {
+              assert.isTrue(registerCallbackCalled);
+              assert.isTrue(machine._transport.disconnect.calledOnce);
+              op.assert();
+              testCallback();
+            });
           })
         }, 2);
+      });
+    });
+  });
+
+  /* Tests_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_036: [ If `PollingTransport.registrationRequest` does not call its callback within `ProvisioningDeviceConstants.defaultTimeoutInterval` ms, register shall with with a `TimeoutError` error. ] */
+  /* Tests_SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_037: [ If `PollingTransport.queryOperationStatus` does not call its callback within `ProvisioningDeviceConstants.defaultTimeoutInterval` ms, register shall with with a `TimeoutError` error. ] */
+  describe('timeout', function() {
+    [
+      {
+        name: 'registrationRequest',
+        preconfigure: () => {
+          machine._transport.registrationRequest = sinon.stub();
+        },
+        assert: () => {
+          assert.isTrue(machine._transport.registrationRequest.calledOnce);
+          assert.isFalse(machine._transport.queryOperationStatus.called);
+        }
+      },
+      {
+        name: 'queryOperationStatus',
+        preconfigure: () => {
+          machine._transport.registrationRequest = registrationRequestReturnsAssigning();
+          machine._transport.queryOperationStatus = sinon.stub();
+        },
+        assert: () => {
+          assert.isTrue(machine._transport.registrationRequest.calledOnce);
+          assert.isTrue(machine._transport.queryOperationStatus.calledOnce);
+        }
+      }
+    ].forEach(function(op) {
+      it ('happens if ' + op.name + ' never returns', function (testCallback) {
+        var clock = sinon.useFakeTimers();
+        var registerCallbackCalled = false;
+        op.preconfigure();
+
+        callRegisterWithDefaultArgs(function(err) {
+          assert.instanceOf(err, errors.TimeoutError);;
+          registerCallbackCalled = true;
+        });
+
+        clock.tick(ProvisioningDeviceConstants.defaultTimeoutInterval);
+        process.nextTick(function() {
+          assert.isTrue(registerCallbackCalled);
+          op.assert();
+          clock.restore();
+          testCallback();
+        });
       });
     });
   });

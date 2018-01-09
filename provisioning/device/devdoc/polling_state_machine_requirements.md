@@ -27,6 +27,8 @@ Register round-trips one step of the registration process, not returning until a
 
 **SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_028: [** If `PollingTransport.registrationRequest` succeeds with status==Failed, it shall fail with a `ProvisioningRegistrationFailedError` error **]**
 
+**SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_036: [** If `PollingTransport.registrationRequest` does not call its callback within `ProvisioningDeviceConstants.defaultTimeoutInterval` ms, register shall with with a `TimeoutError` error. **]**
+
 **SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_018: [** When the polling interval elapses, `register` shall call `PollingTransport.queryOperationStatus`. **]**
 
 **SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_019: [** If `PollingTransport.queryOperationStatus` fails, `register` shall fail. **]**
@@ -38,6 +40,8 @@ Register round-trips one step of the registration process, not returning until a
 **SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_029: [** If `PollingTransport.queryOperationStatus` succeeds with status==Failed, it shall fail with a `ProvisioningRegistrationFailedError` error **]**
 
 **SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_022: [** If `PollingTransport.queryOperationStatus` succeeds with an unknown status, `register` shall fail with a `SyntaxError` and pass the response body and the protocol-specific result to the `callback`. **]**
+
+**SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_037: [** If `PollingTransport.queryOperationStatus` does not call its callback within `ProvisioningDeviceConstants.defaultTimeoutInterval` ms, register shall with with a `TimeoutError` error. **]**
 
 **SRS_NODE_PROVISIONING_TRANSPORT_STATE_MACHINE_18_024: [** If `register` is called while a different request is in progress, it shall fail with an `InvalidOperationError`. **]**
 
