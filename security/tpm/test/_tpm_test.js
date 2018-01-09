@@ -33,17 +33,16 @@ function testFalsyArg(methodUnderTest, argName, argValue, ExpectedErrorType) {
 
 
 describe('tpm', function () {
-  this.timeout(5000);
 
   describe('getEndorsementKey', function() {
     it('returns the endorsement key', function(done) {
-      /*Tests_SRS_NODE_TPM_SECURITY_CLIENT_06_006: [The `getEndorsmentKey` function shall query the TPM hardware and return the `endorsementKey` in the callback.] */
+      /*Tests_SRS_NODE_TPM_SECURITY_CLIENT_06_006: [The `getEndorsementKey` function shall query the TPM hardware and return the `endorsementKey` in the callback.] */
       var client = new TpmSecurityClient(undefined, fakeSimpleTpmClient );
       var persistStub = sinon.stub(client,'_createPersistentPrimary');
       persistStub.withArgs('EK').callsArgWith(4, null, TpmSecurityClient._ekTemplate);
       persistStub.withArgs('SRK').callsArgWith(4, null, TpmSecurityClient._srkTemplate);
       client.getEndorsementKey((err, localEk) => {
-        assert.deepEqual(localEk, TpmSecurityClient._ekTemplate.asTpm2B(), 'Invalid endorsment key returned.');
+        assert.deepEqual(localEk, TpmSecurityClient._ekTemplate.asTpm2B(), 'Invalid endorsement key returned.');
         done();
       });
     });
@@ -55,7 +54,7 @@ describe('tpm', function () {
       var persistStub = sinon.stub(client,'_createPersistentPrimary');
       persistStub.withArgs('EK').callsArgWith(4, deviceError);
       client.getEndorsementKey((err, localEk) => {
-        assert.isNotOk(localEk, 'Invalid endorsment key returned.');
+        assert.isNotOk(localEk, 'Invalid endorsement key returned.');
         assert.strictEqual(deviceError, err, 'improper error returned.')
         done();
       });
@@ -98,7 +97,7 @@ describe('tpm', function () {
     });
 
     it.only('must call activateSymmetricIdentity first', function() {
-      var client = new TpmSecurityClient('MYREGID', fakeSimpleTpmClient);
+      var client = new TpmSecurityClient('registration', fakeSimpleTpmClient);
 
       var activateStub = sinon.stub(client,'_activateSymmetricIdentity')
       activateStub.callsFake((callback) => {this._idKeyPub = null;callback(null,1)});
@@ -115,9 +114,9 @@ describe('tpm', function () {
   describe('getRegistrationId', function() {
     /*Tests_SRS_NODE_TPM_SECURITY_CLIENT_06_003: [If the TpmSecurityClient was given a `registrationId` at creation, that `registrationId` will be returned.] */
     it('returns original id', function(done) {
-      var providedRegistrationClient = new TpmSecurityClient('MYREGID', fakeSimpleTpmClient );
+      var providedRegistrationClient = new TpmSecurityClient('registration', fakeSimpleTpmClient );
       providedRegistrationClient.getRegistrationId((err, id) => {
-        assert.strictEqual(id, 'MYREGID', 'Incorrect registration Id.' );
+        assert.strictEqual(id, 'registration', 'Incorrect registration Id.' );
         done();
       });
     });
@@ -129,7 +128,7 @@ describe('tpm', function () {
         The resultant digest will be base 32 encoded in conformance with the `RFC4648` specification.
         The resultant string will have terminating `=` characters removed.] */
       var providedRegistrationClient = new TpmSecurityClient(undefined, fakeSimpleTpmClient );
-      sinon.stub(providedRegistrationClient,'getEndorsementKey').callsArgWith(0, null, 'MYREGID');
+      sinon.stub(providedRegistrationClient,'getEndorsementKey').callsArgWith(0, null, 'registration');
       providedRegistrationClient.getRegistrationId((err, id) => {
         assert.strictEqual(id, 'vfn2bxtbqwc3pcflozty5reiunt5qm4ztk4ulrszujmqj3zbei2a', 'Incorrect registration Id.' );
         done();
